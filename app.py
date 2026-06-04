@@ -206,11 +206,7 @@ elif menu == "⚙️ Hantera profil":
             tips = profile_data.get("tips", {})
             current_tiebreaker = profile_data.get("tiebreaker", "-")
             
-            if datetime.now() > DEADLINE:
-                st.info("🔒 Redigering är nu stängd. VM har startat!")
-                st.write(f"**Utslagsfråga:** {current_tiebreaker} mål")
-                
-                # Visa nuvarande tips och jämför med facit
+                # Visa nuvarande tips (endast skrivskyddad tabell)
                 visnings_lista = []
                 for m in INITIAL_MATCHES:
                     match_id = str(m["id"])
@@ -223,22 +219,26 @@ elif menu == "⚙️ Hantera profil":
             else:
                 st.write("Här kan du granska och redigera dina lagda tips fram tills att VM startar.")
                 
-                # ---- NY KOD FÖR ATT VISA TIPS VS FACIT INNAN REDIGERING LÅSES ----
-                # Lägg in visningsläget här också, innan man klickar på att redigera.
-                st.write(f"**Utslagsfråga:** {current_tiebreaker} mål")
-                visnings_lista = []
-                for m in INITIAL_MATCHES:
-                    match_id = str(m["id"])
-                    visnings_lista.append({
-                        "Match": m["match"],
-                        "Tippat": tips.get(match_id, ""),
-                        "Facit": data["facit"].get(match_id, "")
-                    })
+                # --- Använd tabs för att separera visning och redigering ---
+                tab1, tab2 = st.tabs(["👁️ Granska Tips", "✏️ Redigera / Radera"])
                 
-                # Vi visar en skrivskyddad tabell först, sedan har vi redigeringsformuläret i en expander
-                st.dataframe(pd.DataFrame(visnings_lista), use_container_width=True, hide_index=True)
+                with tab1:
+                    st.write(f"**Utslagsfråga:** {current_tiebreaker} mål")
+                    visnings_lista = []
+                    for m in INITIAL_MATCHES:
+                        match_id = str(m["id"])
+                        visnings_lista.append({
+                            "Datum": m["datum"],
+                            "Tid": m["tid"],
+                            "Kanal": m["kanal"],
+                            "Match": m["match"],
+                            "Tippat": tips.get(match_id, ""),
+                            "Facit": data["facit"].get(match_id, "")
+                        })
+                    
+                    st.dataframe(pd.DataFrame(visnings_lista), use_container_width=True, hide_index=True)
                 
-                with st.expander("Redigera dina tips"):
+                with tab2:
                     with st.form("edit_form"):
                         st.write(f"**Redigerar tips för:** {vald_profil}")
                         
@@ -290,17 +290,17 @@ elif menu == "⚙️ Hantera profil":
                                     save_data(data)
                                     st.success("Ändringarna har sparats!")
                                     st.rerun()
-                # -------------------------------------------------------------------
 
-            st.divider()
-            
-            # Ta bort
-            if st.checkbox("Jag vill ta bort profilen permanent"):
-                if st.button("🚨 Radera nu"):
-                    del data["profiles"][vald_profil]
-                    save_data(data)
-                    st.success("Profil raderad.")
-                    st.rerun()
+                    st.divider()
+                    
+                    # Ta bort
+                    st.write("### Farlig zon")
+                    if st.checkbox("Jag vill ta bort profilen permanent"):
+                        if st.button("🚨 Radera nu"):
+                            del data["profiles"][vald_profil]
+                            save_data(data)
+                            st.success("Profil raderad.")
+                            st.rerun()
 
 # -- 4. ADMIN: FACIT --
 elif menu == "🔒 Admin: Fyll i Facit":
