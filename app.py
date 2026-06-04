@@ -210,7 +210,7 @@ elif menu == "⚙️ Hantera profil":
                 st.info("🔒 Redigering är nu stängd. VM har startat!")
                 st.write(f"**Utslagsfråga:** {current_tiebreaker} mål")
                 
-                # Visa nuvarande tips (endast skrivskyddad tabell)
+                # Visa nuvarande tips och jämför med facit
                 visnings_lista = []
                 for m in INITIAL_MATCHES:
                     match_id = str(m["id"])
@@ -223,57 +223,74 @@ elif menu == "⚙️ Hantera profil":
             else:
                 st.write("Här kan du granska och redigera dina lagda tips fram tills att VM startar.")
                 
-                with st.form("edit_form"):
-                    st.write(f"**Redigerar tips för:** {vald_profil}")
-                    
-                    edit_tiebreaker = st.number_input(
-                        "Utslagsfråga (Totalt antal mål i VM):", 
-                        min_value=0, 
-                        step=1, 
-                        value=int(current_tiebreaker) if str(current_tiebreaker).isdigit() else 0
-                    )
-                    
-                    st.write("Fyll i 1, X eller 2 nedan:")
-                    
-                    # Förbered redigeringslistan
-                    edit_list = []
-                    for m in INITIAL_MATCHES:
-                        match_id = str(m["id"])
-                        edit_list.append({
-                            "datum": m["datum"],
-                            "tid": m["tid"],
-                            "match": m["match"],
-                            "kanal": m["kanal"],
-                            "Ditt Tips (1, X, 2)": tips.get(match_id, "")
-                        })
+                # ---- NY KOD FÖR ATT VISA TIPS VS FACIT INNAN REDIGERING LÅSES ----
+                # Lägg in visningsläget här också, innan man klickar på att redigera.
+                st.write(f"**Utslagsfråga:** {current_tiebreaker} mål")
+                visnings_lista = []
+                for m in INITIAL_MATCHES:
+                    match_id = str(m["id"])
+                    visnings_lista.append({
+                        "Match": m["match"],
+                        "Tippat": tips.get(match_id, ""),
+                        "Facit": data["facit"].get(match_id, "")
+                    })
+                
+                # Vi visar en skrivskyddad tabell först, sedan har vi redigeringsformuläret i en expander
+                st.dataframe(pd.DataFrame(visnings_lista), use_container_width=True, hide_index=True)
+                
+                with st.expander("Redigera dina tips"):
+                    with st.form("edit_form"):
+                        st.write(f"**Redigerar tips för:** {vald_profil}")
                         
-                    df_edit = pd.DataFrame(edit_list)
-                    redigerad_df = st.data_editor(df_edit, use_container_width=True, hide_index=True)
-                    
-                    submitted_edit = st.form_submit_button("Spara Ändringar")
-                    
-                    if submitted_edit:
-                        if edit_tiebreaker <= 0:
-                            st.error("Du måste fylla i ett giltigt antal mål på utslagsfrågan (mer än 0).")
-                        else:
-                            alla_fyllda = True
-                            new_tips_dict = {}
-                            for i, row in redigerad_df.iterrows():
-                                t = str(row["Ditt Tips (1, X, 2)"]).strip().upper()
-                                if t not in ["1", "X", "2"]:
-                                    alla_fyllda = False
-                                new_tips_dict[str(INITIAL_MATCHES[i]["id"])] = t
-                                
-                            if not alla_fyllda:
-                                st.error("Alla 72 matcher måste vara ifyllda med 1, X eller 2!")
+                        edit_tiebreaker = st.number_input(
+                            "Utslagsfråga (Totalt antal mål i VM):", 
+                            min_value=0, 
+                            step=1, 
+                            value=int(current_tiebreaker) if str(current_tiebreaker).isdigit() else 0
+                        )
+                        
+                        st.write("Fyll i 1, X eller 2 nedan:")
+                        
+                        # Förbered redigeringslistan
+                        edit_list = []
+                        for m in INITIAL_MATCHES:
+                            match_id = str(m["id"])
+                            edit_list.append({
+                                "datum": m["datum"],
+                                "tid": m["tid"],
+                                "match": m["match"],
+                                "kanal": m["kanal"],
+                                "Ditt Tips (1, X, 2)": tips.get(match_id, "")
+                            })
+                            
+                        df_edit = pd.DataFrame(edit_list)
+                        redigerad_df = st.data_editor(df_edit, use_container_width=True, hide_index=True)
+                        
+                        submitted_edit = st.form_submit_button("Spara Ändringar")
+                        
+                        if submitted_edit:
+                            if edit_tiebreaker <= 0:
+                                st.error("Du måste fylla i ett giltigt antal mål på utslagsfrågan (mer än 0).")
                             else:
-                                data["profiles"][vald_profil] = {
-                                    "tips": new_tips_dict,
-                                    "tiebreaker": int(edit_tiebreaker)
-                                }
-                                save_data(data)
-                                st.success("Ändringarna har sparats!")
-                                st.rerun()
+                                alla_fyllda = True
+                                new_tips_dict = {}
+                                for i, row in redigerad_df.iterrows():
+                                    t = str(row["Ditt Tips (1, X, 2)"]).strip().upper()
+                                    if t not in ["1", "X", "2"]:
+                                        alla_fyllda = False
+                                    new_tips_dict[str(INITIAL_MATCHES[i]["id"])] = t
+                                    
+                                if not alla_fyllda:
+                                    st.error("Alla 72 matcher måste vara ifyllda med 1, X eller 2!")
+                                else:
+                                    data["profiles"][vald_profil] = {
+                                        "tips": new_tips_dict,
+                                        "tiebreaker": int(edit_tiebreaker)
+                                    }
+                                    save_data(data)
+                                    st.success("Ändringarna har sparats!")
+                                    st.rerun()
+                # -------------------------------------------------------------------
 
             st.divider()
             
