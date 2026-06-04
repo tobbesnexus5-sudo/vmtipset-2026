@@ -4,12 +4,10 @@ from datetime import datetime
 import json
 import os
 
-# -- INSTÄLLNINGAR --
 st.set_page_config(page_title="VM-Tipset 2026", layout="wide")
 DEADLINE = datetime(2026, 6, 11, 0, 0)
 DATA_FILE = "tips_data.json"
 
-# -- ALLA 72 MATCHER --
 INITIAL_MATCHES = [
   { "id": 1, "datum": "11/6", "grp": "A", "tid": "21:00", "match": "Mexiko – Sydafrika", "kanal": "TV4" },
   { "id": 2, "datum": "12/6", "grp": "A", "tid": "04:00", "match": "Sydkorea – Tjeckien", "kanal": "TV4" },
@@ -85,7 +83,6 @@ INITIAL_MATCHES = [
   { "id": 72, "datum": "28/6", "grp": "J", "tid": "04:00", "match": "Jordanien – Argentina", "kanal": "TV4" }
 ]
 
-# -- DATABASHANTERING (JSON) --
 def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r") as f:
@@ -98,14 +95,11 @@ def save_data(data):
 
 data = load_data()
 
-# -- NAVIGERING --
 menu = st.sidebar.radio("Meny", ["🏆 Startsida (Topplista)", "📝 Skapa ditt tips", "⚙️ Hantera profil", "🔒 Admin: Fyll i Facit"])
 
-# -- 1. STARTSIDA --
 if menu == "🏆 Startsida (Topplista)":
     st.title("🏆 VM-Tipset 2026 - Leaderboard")
     
-    # Regelruta
     st.info("""
     **VM-tipset går ut på att:**
     Tippa rätt resultat (1, X, 2) i samtliga 72 gruppspelsmatcher. Vinner gör den som har flest antal rätt. 
@@ -125,9 +119,14 @@ if menu == "🏆 Startsida (Topplista)":
         scores = []
         for name, profile_data in data["profiles"].items():
             score = 0
-            tips = profile_data.get("tips", {})
-            tiebreaker = profile_data.get("tiebreaker", "-")
-            
+            # Kompatibilitet för både ny och gammal datastruktur
+            if isinstance(profile_data, dict) and "tips" in profile_data:
+                tips = profile_data["tips"]
+                tiebreaker = profile_data.get("tiebreaker", "-")
+            else:
+                tips = profile_data
+                tiebreaker = "-"
+                
             for match in INITIAL_MATCHES:
                 match_id = str(match["id"])
                 if match_id in data["facit"] and data["facit"][match_id] == tips.get(match_id):
@@ -138,7 +137,6 @@ if menu == "🏆 Startsida (Topplista)":
         df.index += 1
         st.dataframe(df, use_container_width=True)
 
-# -- 2. SKAPA PROFIL --
 elif menu == "📝 Skapa ditt tips":
     st.title("Skapa ditt tips")
     
@@ -157,7 +155,6 @@ elif menu == "📝 Skapa ditt tips":
             st.write("---")
             st.write("Fyll i 1, X eller 2 för varje match nedan:")
             
-            # Skapa tabell för input
             df_matches = pd.DataFrame(INITIAL_MATCHES)
             df_matches["Ditt Tips (1, X, 2)"] = ""
             df_display = df_matches[["datum", "tid", "match", "kanal", "Ditt Tips (1, X, 2)"]]
@@ -193,7 +190,6 @@ elif menu == "📝 Skapa ditt tips":
                         st.success(f"Tack för ditt tips, {namn.strip()}! Glöm inte att swisha 200 kr till Christer.K.")
                         st.balloons()
 
-# -- 3. HANTERA PROFIL --
 elif menu == "⚙️ Hantera profil":
     st.title("Hantera profil")
     if not data["profiles"]:
@@ -203,14 +199,27 @@ elif menu == "⚙️ Hantera profil":
         
         if vald_profil:
             profile_data = data["profiles"][vald_profil]
-            tips = profile_data.get("tips", {})
-            current_tiebreaker = profile_data.get("tiebreaker", "-")
             
+            # Hantera bakåtkompatibilitet
+            if isinstance(profile_data, dict) and "tips" in profile_data:
+                tips = profile_data["tips"]
+                current_tiebreaker = profile_data.get("tiebreaker", "-")
+            else:
+                tips = profile_data
+                current_tiebreaker = "-"
+            
+            if datetime.now() > DEADLINE:
+                st.info("🔒 Redigering är nu stängd. VM har startat!")
+                st.write(f"**Utslagsfråga:** {current_tiebreaker} mål")
+                
                 # Visa nuvarande tips (endast skrivskyddad tabell)
                 visnings_lista = []
                 for m in INITIAL_MATCHES:
                     match_id = str(m["id"])
                     visnings_lista.append({
+                        "Datum": m["datum"],
+                        "Tid": m["tid"],
+                        "Kanal": m["kanal"],
                         "Match": m["match"],
                         "Tippat": tips.get(match_id, ""),
                         "Facit": data["facit"].get(match_id, "")
@@ -302,7 +311,6 @@ elif menu == "⚙️ Hantera profil":
                             st.success("Profil raderad.")
                             st.rerun()
 
-# -- 4. ADMIN: FACIT --
 elif menu == "🔒 Admin: Fyll i Facit":
     st.title("Fyll i Matchresultat")
     st.write("Resultaten du fyller i här uppdaterar topplistan.")
